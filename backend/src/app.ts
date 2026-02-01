@@ -3,6 +3,8 @@ import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import healthRoutes from './routes/health';
+import authRoutes from './routes/auth.routes';
+import examplesRoutes from './routes/examples.routes';
 
 dotenv.config();
 
@@ -20,6 +22,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/health', healthRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/examples', examplesRoutes);
 
 // Health check endpoint
 app.get('/api', (_req: Request, res: Response) => {
