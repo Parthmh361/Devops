@@ -1,0 +1,336 @@
+{
+  "info": {
+    "name": "Admin Panel APIs",
+    "description": "Admin Panel endpoints for Event Sponsorship Platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{admin_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "event_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Setup - Register Admin",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Admin User\",\n  \"email\": \"admin@platform.com\",\n  \"password\": \"Admin123456\",\n  \"role\": \"admin\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/register",
+          "host": ["{{base_url}}"],
+          "path": ["auth", "register"]
+        },
+        "description": "Register an admin user. Copy the token from response to admin_token variable."
+      }
+    },
+    {
+      "name": "User Management",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/users?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "role",
+                  "value": "organizer",
+                  "disabled": true
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "test",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Filter Users by Role",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/users?role=organizer&page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users"],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "organizer"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/users?search=tech",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "tech"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Deactivate User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/users/{{user_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users", "{{user_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Activate User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/users/{{user_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users", "{{user_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Delete User (Soft)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/admin/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users", "{{user_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Event Moderation",
+      "item": [
+        {
+          "name": "Get All Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/events?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "events"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "published",
+                  "disabled": true
+                },
+                {
+                  "key": "isApproved",
+                  "value": "false",
+                  "disabled": true
+                },
+                {
+                  "key": "eventMode",
+                  "value": "hybrid",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter Events - Pending Approval",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/events?status=published&isApproved=false",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "events"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "published"
+                },
+                {
+                  "key": "isApproved",
+                  "value": "false"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Approve Event",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/admin/events/{{event_id}}/approve",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "events", "{{event_id}}", "approve"]
+            }
+          }
+        },
+        {
+          "name": "Reject Event",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Event description does not meet quality standards. Please provide more details about speakers, agenda, and expected outcomes.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/events/{{event_id}}/reject",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "events", "{{event_id}}", "reject"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Get Analytics Overview",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/analytics/overview",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "analytics", "overview"]
+            },
+            "description": "Get platform statistics including users, events, proposals, and collaborations counts by status."
+          }
+        },
+        {
+          "name": "Get Analytics Trends",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/analytics/trends",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "analytics", "trends"]
+            },
+            "description": "Get growth trends for last 6 months including new users and events per month."
+          }
+        }
+      ]
+    }
+  ]
+}
