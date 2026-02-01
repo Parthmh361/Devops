@@ -1,0 +1,349 @@
+{
+  "info": {
+    "name": "Collaboration & Communication API",
+    "description": "Endpoints for collaboration state management, messaging, and document sharing",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Collaboration State Machine",
+      "item": [
+        {
+          "name": "Activate Collaboration",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{organizer_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/collaborations/{{collaboration_id}}/activate",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "collaborations", "{{collaboration_id}}", "activate"]
+            },
+            "description": "Activate a pending collaboration (pending → active). Only organizer can activate."
+          }
+        },
+        {
+          "name": "Complete Collaboration",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participant_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/collaborations/{{collaboration_id}}/complete",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "collaborations", "{{collaboration_id}}", "complete"]
+            },
+            "description": "Mark active collaboration as completed (active → completed). Organizer or Sponsor can complete."
+          }
+        },
+        {
+          "name": "Terminate Collaboration",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{organizer_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Sponsor failed to meet payment obligations\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/collaborations/{{collaboration_id}}/terminate",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "collaborations", "{{collaboration_id}}", "terminate"]
+            },
+            "description": "Terminate active collaboration (active → terminated). Only organizer can terminate. Optionally provide reason."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messaging",
+      "item": [
+        {
+          "name": "Get Messages (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participant_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/messages/{{collaboration_id}}?page=1&limit=20",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "messages", "{{collaboration_id}}"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Get all messages in a collaboration with pagination. Sorted by createdAt ascending."
+          }
+        },
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participant_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Let's schedule a meeting to finalize the sponsorship details. I have availability next Tuesday.\",\n  \"attachments\": [\n    {\n      \"fileName\": \"event_schedule.pdf\",\n      \"fileUrl\": \"/uploads/schedules/event_schedule.pdf\",\n      \"fileType\": \"application/pdf\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/messages/{{collaboration_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "messages", "{{collaboration_id}}"]
+            },
+            "description": "Create a new message in the collaboration. Only collaboration participants can send messages. Content: 1-5000 characters."
+          }
+        },
+        {
+          "name": "Mark Message as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participant_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/messages/{{message_id}}/read",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "messages", "{{message_id}}", "read"]
+            },
+            "description": "Mark a specific message as read."
+          }
+        },
+        {
+          "name": "Get Unread Message Count",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participant_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/messages/{{collaboration_id}}/unread-count",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "messages", "{{collaboration_id}}", "unread-count"]
+            },
+            "description": "Get count of unread messages in a collaboration."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Document Management",
+      "item": [
+        {
+          "name": "Upload Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participant_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "/path/to/document.pdf"
+                },
+                {
+                  "key": "documentType",
+                  "type": "text",
+                  "value": "agreement"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:5000/api/documents/{{collaboration_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "documents", "{{collaboration_id}}"]
+            },
+            "description": "Upload a document to collaboration. File types: PDF, JPEG, PNG, DOCX. Max size: 10MB. DocumentType: agreement|invoice|deck|other (optional, default: other)."
+          }
+        },
+        {
+          "name": "List Documents (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participant_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/documents/{{collaboration_id}}?page=1&limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "documents", "{{collaboration_id}}"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get all documents in a collaboration with pagination. Sorted by createdAt descending."
+          }
+        },
+        {
+          "name": "Download Document",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participant_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/documents/download/{{document_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "documents", "download", "{{document_id}}"]
+            },
+            "description": "Download a document file. Returns binary file with original filename."
+          }
+        },
+        {
+          "name": "Delete Document",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:5000/api/documents/{{document_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["api", "documents", "{{document_id}}"]
+            },
+            "description": "Delete a document. Can be done by document uploader, organizer, or admin."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "organizer_token",
+      "value": "eyJhbGc...",
+      "type": "string"
+    },
+    {
+      "key": "sponsor_token",
+      "value": "eyJhbGc...",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "eyJhbGc...",
+      "type": "string"
+    },
+    {
+      "key": "participant_token",
+      "value": "eyJhbGc...",
+      "type": "string"
+    },
+    {
+      "key": "collaboration_id",
+      "value": "507f1f77bcf86cd799439011",
+      "type": "string"
+    },
+    {
+      "key": "message_id",
+      "value": "507f1f77bcf86cd799439012",
+      "type": "string"
+    },
+    {
+      "key": "document_id",
+      "value": "507f1f77bcf86cd799439013",
+      "type": "string"
+    }
+  ]
+}

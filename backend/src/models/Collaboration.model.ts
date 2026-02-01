@@ -5,8 +5,8 @@ export interface ICollaboration extends Document {
   organizer: mongoose.Types.ObjectId;
   sponsor: mongoose.Types.ObjectId;
   proposal: mongoose.Types.ObjectId;
-  status: 'active' | 'completed' | 'terminated';
-  startDate: Date;
+  status: 'pending' | 'active' | 'completed' | 'terminated';
+  startDate?: Date;
   endDate?: Date;
   notes?: string;
   createdAt: Date;
@@ -37,13 +37,11 @@ const CollaborationSchema = new Schema<ICollaboration>(
     },
     status: {
       type: String,
-      enum: ['active', 'completed', 'terminated'],
-      default: 'active',
+      enum: ['pending', 'active', 'completed', 'terminated'],
+      default: 'pending',
     },
     startDate: {
       type: Date,
-      required: true,
-      default: Date.now,
     },
     endDate: {
       type: Date,

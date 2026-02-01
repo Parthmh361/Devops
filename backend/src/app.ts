@@ -10,6 +10,9 @@ import proposalRoutes from './routes/proposal.routes';
 import collaborationRoutes from './routes/collaboration.routes';
 import notificationRoutes from './routes/notification.routes';
 import organizerRoutes from './routes/organizer.routes';
+import sponsorRoutes from './routes/sponsor.routes';
+import messageRoutes from './routes/message.routes';
+import documentRoutes from './routes/document.routes';
 
 dotenv.config();
 
@@ -34,6 +37,9 @@ app.use('/api/proposals', proposalRoutes);
 app.use('/api/collaborations', collaborationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/organizer', organizerRoutes);
+app.use('/api/sponsor', sponsorRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Health check endpoint
 app.get('/api', (_req: Request, res: Response) => {

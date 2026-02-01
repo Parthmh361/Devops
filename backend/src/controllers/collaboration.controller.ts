@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { isValidObjectId } from 'mongoose';
 import Collaboration from '../models/Collaboration.model';
 
 /**
@@ -8,8 +9,8 @@ import Collaboration from '../models/Collaboration.model';
  */
 export const getCollaborations = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).user?.userId;
-    const userRole = (req as any).user?.role;
+    const userId = (req as any).userId;
+    const userRole = (req as any).userRole;
 
     let filter: any = {};
 
@@ -55,8 +56,17 @@ export const getCollaborations = async (req: Request, res: Response): Promise<vo
 export const getCollaborationById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.userId;
-    const userRole = (req as any).user?.role;
+    const userId = (req as any).userId;
+    const userRole = (req as any).userRole;
+
+    // Validate collaboration ID
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid collaboration ID',
+      });
+      return;
+    }
 
     const collaboration = await Collaboration.findById(id)
       .populate('event')
@@ -107,7 +117,16 @@ export const updateCollaboration = async (req: Request, res: Response): Promise<
   try {
     const { id } = req.params;
     const { status, endDate, notes } = req.body;
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).userId;
+
+    // Validate collaboration ID
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid collaboration ID',
+      });
+      return;
+    }
 
     const collaboration = await Collaboration.findById(id);
 
@@ -133,11 +152,11 @@ export const updateCollaboration = async (req: Request, res: Response): Promise<
 
     // Update allowed fields
     if (status) {
-      const validStatuses = ['active', 'completed', 'terminated'];
+      const validStatuses = ['pending', 'active', 'completed', 'terminated'];
       if (!validStatuses.includes(status)) {
         res.status(400).json({
           success: false,
-          message: 'Invalid status. Must be: active, completed, or terminated',
+          message: 'Invalid status. Must be: pending, active, completed, or terminated',
         });
         return;
       }
@@ -165,6 +184,227 @@ export const updateCollaboration = async (req: Request, res: Response): Promise<
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to update collaboration',
+    });
+  }
+};
+
+/**
+ * PATCH /api/collaborations/:id/activate
+ * Activate a collaboration (pending → active)
+ * Auth: Organizer only
+ */
+export const activateCollaboration = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).userId;
+
+    // Validate collaboration ID
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid collaboration ID',
+      });
+      return;
+    }
+
+    const collaboration = await Collaboration.findById(id);
+
+    if (!collaboration) {
+      res.status(404).json({
+        success: false,
+        message: 'Collaboration not found',
+      });
+      return;
+    }
+
+    // Only organizer can activate
+    if (collaboration.organizer.toString() !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'Only the organizer can activate a collaboration',
+      });
+      return;
+    }
+
+    // Validate state transition: pending → active
+    if ((collaboration.status as any) !== 'pending') {
+      res.status(400).json({
+        success: false,
+        message: `Cannot activate collaboration in ${collaboration.status} state. Must be in pending state.`,
+      });
+      return;
+    }
+
+    // Update status and set start date
+    collaboration.status = 'active';
+    collaboration.startDate = new Date();
+    await collaboration.save();
+
+    await collaboration.populate([
+      { path: 'event', select: 'title' },
+      { path: 'organizer', select: 'name email' },
+      { path: 'sponsor', select: 'name email' },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: 'Collaboration activated successfully',
+      data: collaboration,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * PATCH /api/collaborations/:id/complete
+ * Mark collaboration as completed (active → completed)
+ * Auth: Organizer or Sponsor
+ */
+export const completeCollaboration = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).userId;
+
+    // Validate collaboration ID
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid collaboration ID',
+      });
+      return;
+    }
+
+    const collaboration = await Collaboration.findById(id);
+
+    if (!collaboration) {
+      res.status(404).json({
+        success: false,
+        message: 'Collaboration not found',
+      });
+      return;
+    }
+
+    // Organizer or Sponsor can complete
+    const isParticipant =
+      collaboration.organizer.toString() === userId ||
+      collaboration.sponsor.toString() === userId;
+
+    if (!isParticipant) {
+      res.status(403).json({
+        success: false,
+        message: 'Only collaboration participants can mark it as completed',
+      });
+      return;
+    }
+
+    // Validate state transition: active → completed
+    if (collaboration.status !== 'active') {
+      res.status(400).json({
+        success: false,
+        message: `Cannot complete collaboration in ${collaboration.status} state. Must be in active state.`,
+      });
+      return;
+    }
+
+    // Update status and set end date
+    collaboration.status = 'completed';
+    collaboration.endDate = new Date();
+    await collaboration.save();
+
+    await collaboration.populate([
+      { path: 'event', select: 'title' },
+      { path: 'organizer', select: 'name email' },
+      { path: 'sponsor', select: 'name email' },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: 'Collaboration marked as completed',
+      data: collaboration,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * PATCH /api/collaborations/:id/terminate
+ * Terminate a collaboration (active → terminated)
+ * Auth: Organizer only
+ */
+export const terminateCollaboration = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).userId;
+    const { reason } = req.body;
+
+    // Validate collaboration ID
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid collaboration ID',
+      });
+      return;
+    }
+
+    const collaboration = await Collaboration.findById(id);
+
+    if (!collaboration) {
+      res.status(404).json({
+        success: false,
+        message: 'Collaboration not found',
+      });
+      return;
+    }
+
+    // Only organizer can terminate
+    if (collaboration.organizer.toString() !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'Only the organizer can terminate a collaboration',
+      });
+      return;
+    }
+
+    // Validate state transition: active → terminated
+    if (collaboration.status !== 'active') {
+      res.status(400).json({
+        success: false,
+        message: `Cannot terminate collaboration in ${collaboration.status} state. Must be in active state.`,
+      });
+      return;
+    }
+
+    // Update status, end date, and notes
+    collaboration.status = 'terminated';
+    collaboration.endDate = new Date();
+    if (reason) {
+      collaboration.notes = `Terminated: ${reason}`;
+    }
+    await collaboration.save();
+
+    await collaboration.populate([
+      { path: 'event', select: 'title' },
+      { path: 'organizer', select: 'name email' },
+      { path: 'sponsor', select: 'name email' },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: 'Collaboration terminated successfully',
+      data: collaboration,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 };

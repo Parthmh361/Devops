@@ -69,21 +69,68 @@ export const createEvent = async (req: Request, res: Response): Promise<void> =>
  */
 export const getEvents = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { category, eventMode } = req.query;
+    const {
+      search,
+      category,
+      eventMode,
+      minAmount,
+      maxAmount,
+      startDate,
+      endDate,
+      page = '1',
+      limit = '10',
+    } = req.query;
+
     const filter: any = { status: 'published', isApproved: true };
 
     if (category) filter.category = category;
     if (eventMode) filter.eventMode = eventMode;
 
-    const events = await Event.find(filter)
-      .populate('organizer', 'name email organizationName')
-      .sort({ startDate: 1 })
-      .limit(50);
+    if (search && String(search).trim().length > 0) {
+      const searchValue = String(search).trim();
+      filter.$or = [
+        { title: { $regex: searchValue, $options: 'i' } },
+        { description: { $regex: searchValue, $options: 'i' } },
+      ];
+    }
+
+    const amountFilter: any = {};
+    if (minAmount !== undefined) amountFilter.$gte = Number(minAmount);
+    if (maxAmount !== undefined) amountFilter.$lte = Number(maxAmount);
+    if (Object.keys(amountFilter).length > 0) {
+      filter['sponsorshipNeeds.tiers'] = { $elemMatch: { amount: amountFilter } };
+    }
+
+    if (startDate) {
+      filter.startDate = { ...(filter.startDate || {}), $gte: new Date(String(startDate)) };
+    }
+    if (endDate) {
+      filter.endDate = { ...(filter.endDate || {}), $lte: new Date(String(endDate)) };
+    }
+
+    const pageNumber = Math.max(1, Number(page));
+    const limitNumber = Math.min(50, Math.max(1, Number(limit)));
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const [events, total] = await Promise.all([
+      Event.find(filter)
+        .populate('organizer', 'name email organizationName')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNumber)
+        .lean(),
+      Event.countDocuments(filter),
+    ]);
 
     res.status(200).json({
       success: true,
       data: events,
-      count: events.length,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        total,
+        pages: Math.ceil(total / limitNumber),
+      },
     });
   } catch (error: any) {
     console.error('Get events error:', error);

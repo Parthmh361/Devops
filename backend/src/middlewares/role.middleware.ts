@@ -25,6 +25,7 @@ export const authorizeRoles = (...allowedRoles: Array<'organizer' | 'sponsor' | 
 
       // Check if user role is in allowed roles
       if (!allowedRoles.includes(req.user.role)) {
+        console.log(`[Authorization] User role '${req.user.role}' not in allowed roles [${allowedRoles.join(', ')}]`);
         res.status(403).json({
           success: false,
           message: `Access denied. Required role(s): ${allowedRoles.join(', ')}. Your role: ${req.user.role}`,

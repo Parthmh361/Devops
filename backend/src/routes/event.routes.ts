@@ -9,6 +9,7 @@ import {
   updateEvent,
   deleteEvent,
   publishEvent,
+  approveEvent,
   updateSponsorshipRequirements,
 } from '../controllers/event.controller';
 
@@ -40,6 +41,9 @@ router.delete('/:id', authenticate, authorizeRoles('organizer'), deleteEvent);
 
 // Publish event (organizer only)
 router.patch('/:id/publish', authenticate, authorizeRoles('organizer'), publishEvent);
+
+// Approve event (admin only)
+router.post('/:id/approve', authenticate, authorizeRoles('admin'), approveEvent);
 
 // Update sponsorship requirements (organizer only)
 router.put(

@@ -49,8 +49,8 @@ const SponsorshipProposalSchema = new Schema<ISponsorshipProposal>(
   { timestamps: true }
 );
 
-// Composite index: one proposal per sponsor per event
-SponsorshipProposalSchema.index({ event: 1, sponsor: 1 }, { unique: true });
+// Indexes for query optimization
+SponsorshipProposalSchema.index({ event: 1, sponsor: 1, status: 1 }); // Composite index for checking active proposals
 SponsorshipProposalSchema.index({ status: 1 });
 SponsorshipProposalSchema.index({ sponsor: 1 });
 

@@ -42,6 +42,8 @@ export const authenticate = (
 
     // Attach user payload to request
     req.user = decoded;
+    (req as any).userId = decoded.userId;
+    (req as any).userRole = decoded.role;
 
     next();
   } catch (error: any) {

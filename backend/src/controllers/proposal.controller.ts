@@ -33,6 +33,14 @@ export const createProposal = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    if (Number(proposedAmount) <= 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Proposed amount must be greater than 0',
+      });
+      return;
+    }
+
     // Check if event exists
     const event = await Event.findById(eventId);
     if (!event) {
@@ -43,16 +51,25 @@ export const createProposal = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Check if already proposed by same sponsor
+    if (event.status !== 'published' || event.isApproved !== true) {
+      res.status(403).json({
+        success: false,
+        message: 'You can only propose to published and approved events',
+      });
+      return;
+    }
+
+    // Check if already has an active (non-terminal) proposal for this event
     const existingProposal = await SponsorshipProposal.findOne({
       event: eventId,
       sponsor: sponsorId,
+      status: { $in: ['pending', 'negotiation'] }, // Only block if there's an active proposal
     });
 
     if (existingProposal) {
       res.status(409).json({
         success: false,
-        message: 'You have already submitted a proposal for this event',
+        message: 'You already have an active proposal for this event. Please wait for a response or withdraw it first.',
       });
       return;
     }
@@ -162,9 +179,10 @@ export const getMyProposals = async (req: Request, res: Response): Promise<void>
     const sponsorId = (req as any).user?.userId;
 
     const proposals = await SponsorshipProposal.find({ sponsor: sponsorId })
-      .populate('event', 'title startDate endDate')
+      .populate('event', 'title startDate endDate category eventMode')
       .populate('sponsor', 'name email')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json({
       success: true,
@@ -176,6 +194,52 @@ export const getMyProposals = async (req: Request, res: Response): Promise<void>
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch proposals',
+    });
+  }
+};
+
+/**
+ * Get sponsor proposals dashboard
+ * GET /api/sponsor/proposals
+ * Auth: Sponsor only
+ */
+export const getSponsorProposals = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const sponsorId = (req as any).user?.userId;
+    const { status, eventId } = req.query;
+
+    const filter: any = { sponsor: sponsorId };
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (eventId) {
+      if (!isValidObjectId(String(eventId))) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid event ID',
+        });
+        return;
+      }
+      filter.event = eventId;
+    }
+
+    const proposals = await SponsorshipProposal.find(filter)
+      .populate('event', 'title startDate endDate category eventMode status isApproved')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      data: proposals,
+      count: proposals.length,
+    });
+  } catch (error: any) {
+    console.error('Get sponsor proposals error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch sponsor proposals',
     });
   }
 };
@@ -278,15 +342,18 @@ export const acceptProposal = async (req: Request, res: Response): Promise<void>
     await proposal.save();
 
     const existingCollaboration = await Collaboration.findOne({ proposal: proposal._id });
+    let collaboration;
+    
     if (!existingCollaboration) {
-      const collaboration = new Collaboration({
+      collaboration = new Collaboration({
         event: proposal.event._id,
         organizer: event?.organizer,
         sponsor: proposal.sponsor,
         proposal: proposal._id,
-        startDate: new Date(),
       });
       await collaboration.save();
+    } else {
+      collaboration = existingCollaboration;
     }
 
     await proposal.populate([
@@ -297,7 +364,10 @@ export const acceptProposal = async (req: Request, res: Response): Promise<void>
     res.status(200).json({
       success: true,
       message: 'Proposal accepted successfully',
-      data: proposal,
+      data: {
+        ...proposal.toObject(),
+        collaboration: collaboration._id,
+      },
     });
   } catch (error: any) {
     console.error('Accept proposal error:', error);
