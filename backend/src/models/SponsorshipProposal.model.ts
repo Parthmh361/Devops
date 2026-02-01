@@ -6,6 +6,7 @@ export interface ISponsorshipProposal extends Document {
   proposedAmount: number;
   proposedBenefits: string[];
   message?: string;
+  responseNote?: string;
   status: 'pending' | 'accepted' | 'rejected' | 'negotiation';
   createdAt: Date;
   updatedAt: Date;
@@ -32,6 +33,10 @@ const SponsorshipProposalSchema = new Schema<ISponsorshipProposal>(
       type: String,
     }],
     message: {
+      type: String,
+      trim: true,
+    },
+    responseNote: {
       type: String,
       trim: true,
     },

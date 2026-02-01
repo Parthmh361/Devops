@@ -3,10 +3,11 @@ import { authenticate } from '../middlewares/auth.middleware';
 import { authorizeRoles } from '../middlewares/role.middleware';
 import {
   createProposal,
-  getProposals,
   getMyProposals,
   getProposalById,
-  respondToProposal,
+  acceptProposal,
+  rejectProposal,
+  negotiateProposal,
 } from '../controllers/proposal.controller';
 
 const router: Router = express.Router();
@@ -21,18 +22,21 @@ router.post('/', authenticate, authorizeRoles('sponsor'), createProposal);
 router.get('/my-proposals', authenticate, authorizeRoles('sponsor'), getMyProposals);
 
 /**
- * ORGANIZER ROUTES
- */
-// Get proposals for an event (organizer only)
-router.get('/', authenticate, authorizeRoles('organizer'), getProposals);
-
-// Respond to proposal (accept/reject/negotiate)
-router.put('/:id', authenticate, authorizeRoles('organizer'), respondToProposal);
-
-/**
  * SHARED ROUTES
  */
 // Get single proposal (organizer or sponsor)
 router.get('/:id', authenticate, getProposalById);
+
+/**
+ * ORGANIZER ACTIONS
+ */
+// Accept proposal
+router.patch('/:id/accept', authenticate, authorizeRoles('organizer'), acceptProposal);
+
+// Reject proposal
+router.patch('/:id/reject', authenticate, authorizeRoles('organizer'), rejectProposal);
+
+// Negotiate proposal
+router.patch('/:id/negotiate', authenticate, authorizeRoles('organizer'), negotiateProposal);
 
 export default router;

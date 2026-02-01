@@ -9,6 +9,7 @@ import eventRoutes from './routes/event.routes';
 import proposalRoutes from './routes/proposal.routes';
 import collaborationRoutes from './routes/collaboration.routes';
 import notificationRoutes from './routes/notification.routes';
+import organizerRoutes from './routes/organizer.routes';
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/proposals', proposalRoutes);
 app.use('/api/collaborations', collaborationRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/organizer', organizerRoutes);
 
 // Health check endpoint
 app.get('/api', (_req: Request, res: Response) => {

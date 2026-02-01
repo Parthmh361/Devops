@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import SponsorshipProposal from '../models/SponsorshipProposal.model';
 import Collaboration from '../models/Collaboration.model';
-import Notification from '../models/Notification.model';
 import Event from '../models/Event.model';
+
+const isValidObjectId = (id: string): boolean => mongoose.Types.ObjectId.isValid(id);
 
 /**
  * Create sponsorship proposal
@@ -19,6 +21,14 @@ export const createProposal = async (req: Request, res: Response): Promise<void>
       res.status(400).json({
         success: false,
         message: 'Event ID and proposed amount are required',
+      });
+      return;
+    }
+
+    if (!isValidObjectId(eventId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid event ID',
       });
       return;
     }
@@ -62,19 +72,6 @@ export const createProposal = async (req: Request, res: Response): Promise<void>
       { path: 'sponsor', select: 'name email organizationName' },
     ]);
 
-    // Create notification for organizer
-    const organizerNotification = new Notification({
-      user: event.organizer,
-      title: 'New Sponsorship Proposal',
-      message: `New sponsorship proposal received for event: ${event.title}`,
-      type: 'proposal',
-      relatedEntity: {
-        type: 'proposal',
-        id: newProposal._id,
-      },
-    });
-    await organizerNotification.save();
-
     res.status(201).json({
       success: true,
       message: 'Proposal submitted successfully',
@@ -90,42 +87,50 @@ export const createProposal = async (req: Request, res: Response): Promise<void>
 };
 
 /**
- * Get proposals for an event (organizer only)
- * GET /api/proposals?eventId=:eventId
- * Auth: Organizer of the event
+ * Get proposals for organizer's events
+ * GET /api/organizer/proposals
+ * Auth: Organizer only
  */
-export const getProposals = async (req: Request, res: Response): Promise<void> => {
+export const getOrganizerProposals = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, status } = req.query;
     const userId = (req as any).user?.userId;
 
-    if (!eventId) {
-      res.status(400).json({
-        success: false,
-        message: 'Event ID is required',
-      });
-      return;
+    let eventIds: string[] = [];
+
+    if (eventId) {
+      if (!isValidObjectId(String(eventId))) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid event ID',
+        });
+        return;
+      }
+
+      const event = await Event.findById(eventId);
+      if (!event) {
+        res.status(404).json({
+          success: false,
+          message: 'Event not found',
+        });
+        return;
+      }
+
+      if (event.organizer.toString() !== userId) {
+        res.status(403).json({
+          success: false,
+          message: 'You can only view proposals for your own events',
+        });
+        return;
+      }
+
+      eventIds = [event._id.toString()];
+    } else {
+      const organizerEvents = await Event.find({ organizer: userId }).select('_id');
+      eventIds = organizerEvents.map((e) => e._id.toString());
     }
 
-    // Check if user is the event organizer
-    const event = await Event.findById(eventId);
-    if (!event) {
-      res.status(404).json({
-        success: false,
-        message: 'Event not found',
-      });
-      return;
-    }
-
-    if (event.organizer.toString() !== userId) {
-      res.status(403).json({
-        success: false,
-        message: 'You can only view proposals for your own events',
-      });
-      return;
-    }
-
-    const filter: any = { event: eventId };
+    const filter: any = { event: { $in: eventIds } };
     if (status) filter.status = status;
 
     const proposals = await SponsorshipProposal.find(filter)
@@ -185,6 +190,14 @@ export const getProposalById = async (req: Request, res: Response): Promise<void
     const { id } = req.params;
     const userId = (req as any).user?.userId;
 
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid proposal ID',
+      });
+      return;
+    }
+
     const proposal = await SponsorshipProposal.findById(id)
       .populate('event', 'title description')
       .populate('sponsor', 'name email organizationName');
@@ -224,15 +237,22 @@ export const getProposalById = async (req: Request, res: Response): Promise<void
 };
 
 /**
- * Respond to proposal (accept/reject/negotiate)
- * PUT /api/proposals/:id
+ * Accept proposal (organizer)
+ * PATCH /api/proposals/:id/accept
  * Auth: Organizer of the event
  */
-export const respondToProposal = async (req: Request, res: Response): Promise<void> => {
+export const acceptProposal = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
     const userId = (req as any).user?.userId;
+
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid proposal ID',
+      });
+      return;
+    }
 
     const proposal = await SponsorshipProposal.findById(id);
 
@@ -249,25 +269,16 @@ export const respondToProposal = async (req: Request, res: Response): Promise<vo
     if (event?.organizer.toString() !== userId) {
       res.status(403).json({
         success: false,
-        message: 'You can only respond to proposals for your own events',
+        message: 'You can only accept proposals for your own events',
       });
       return;
     }
 
-    const validStatuses = ['accepted', 'rejected', 'negotiation'];
-    if (!validStatuses.includes(status)) {
-      res.status(400).json({
-        success: false,
-        message: 'Invalid status. Must be: accepted, rejected, or negotiation',
-      });
-      return;
-    }
-
-    proposal.status = status;
+    proposal.status = 'accepted';
     await proposal.save();
 
-    // If accepted, create collaboration
-    if (status === 'accepted') {
+    const existingCollaboration = await Collaboration.findOne({ proposal: proposal._id });
+    if (!existingCollaboration) {
       const collaboration = new Collaboration({
         event: proposal.event._id,
         organizer: event?.organizer,
@@ -276,31 +287,6 @@ export const respondToProposal = async (req: Request, res: Response): Promise<vo
         startDate: new Date(),
       });
       await collaboration.save();
-
-      // Create notifications
-      const sponsorNotification = new Notification({
-        user: proposal.sponsor,
-        title: 'Proposal Accepted',
-        message: `Your sponsorship proposal for event "${event?.title}" has been accepted!`,
-        type: 'proposal',
-        relatedEntity: {
-          type: 'proposal',
-          id: proposal._id,
-        },
-      });
-      await sponsorNotification.save();
-    } else if (status === 'rejected') {
-      const sponsorNotification = new Notification({
-        user: proposal.sponsor,
-        title: 'Proposal Rejected',
-        message: `Your sponsorship proposal for event "${event?.title}" has been rejected.`,
-        type: 'proposal',
-        relatedEntity: {
-          type: 'proposal',
-          id: proposal._id,
-        },
-      });
-      await sponsorNotification.save();
     }
 
     await proposal.populate([
@@ -310,14 +296,136 @@ export const respondToProposal = async (req: Request, res: Response): Promise<vo
 
     res.status(200).json({
       success: true,
-      message: `Proposal ${status} successfully`,
+      message: 'Proposal accepted successfully',
       data: proposal,
     });
   } catch (error: any) {
-    console.error('Respond to proposal error:', error);
+    console.error('Accept proposal error:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to respond to proposal',
+      message: error.message || 'Failed to accept proposal',
+    });
+  }
+};
+
+/**
+ * Reject proposal (organizer)
+ * PATCH /api/proposals/:id/reject
+ * Auth: Organizer of the event
+ */
+export const rejectProposal = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const userId = (req as any).user?.userId;
+
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid proposal ID',
+      });
+      return;
+    }
+
+    const proposal = await SponsorshipProposal.findById(id);
+
+    if (!proposal) {
+      res.status(404).json({
+        success: false,
+        message: 'Proposal not found',
+      });
+      return;
+    }
+
+    const event = await Event.findById(proposal.event._id);
+    if (event?.organizer.toString() !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'You can only reject proposals for your own events',
+      });
+      return;
+    }
+
+    proposal.status = 'rejected';
+    if (reason) {
+      proposal.responseNote = reason;
+    }
+    await proposal.save();
+
+    await proposal.populate([
+      { path: 'event', select: 'title' },
+      { path: 'sponsor', select: 'name email' },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: 'Proposal rejected successfully',
+      data: proposal,
+    });
+  } catch (error: any) {
+    console.error('Reject proposal error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to reject proposal',
+    });
+  }
+};
+
+/**
+ * Negotiate proposal (organizer)
+ * PATCH /api/proposals/:id/negotiate
+ * Auth: Organizer of the event
+ */
+export const negotiateProposal = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).user?.userId;
+
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid proposal ID',
+      });
+      return;
+    }
+
+    const proposal = await SponsorshipProposal.findById(id);
+
+    if (!proposal) {
+      res.status(404).json({
+        success: false,
+        message: 'Proposal not found',
+      });
+      return;
+    }
+
+    const event = await Event.findById(proposal.event._id);
+    if (event?.organizer.toString() !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'You can only negotiate proposals for your own events',
+      });
+      return;
+    }
+
+    proposal.status = 'negotiation';
+    await proposal.save();
+
+    await proposal.populate([
+      { path: 'event', select: 'title' },
+      { path: 'sponsor', select: 'name email' },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: 'Proposal moved to negotiation',
+      data: proposal,
+    });
+  } catch (error: any) {
+    console.error('Negotiate proposal error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to negotiate proposal',
     });
   }
 };

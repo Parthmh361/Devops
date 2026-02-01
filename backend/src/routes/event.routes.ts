@@ -1,6 +1,6 @@
 import express, { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware';
-import { authorizeRoles, adminOnly } from '../middlewares/role.middleware';
+import { authorizeRoles } from '../middlewares/role.middleware';
 import {
   createEvent,
   getEvents,
@@ -9,7 +9,7 @@ import {
   updateEvent,
   deleteEvent,
   publishEvent,
-  approveEvent,
+  updateSponsorshipRequirements,
 } from '../controllers/event.controller';
 
 const router: Router = express.Router();
@@ -20,6 +20,9 @@ const router: Router = express.Router();
 // Get all published & approved events
 router.get('/', getEvents);
 
+// Get organizer's events
+router.get('/my', authenticate, authorizeRoles('organizer'), getMyEvents);
+
 // Get single event (public for published, auth for others)
 router.get('/:id', getEventById);
 
@@ -29,9 +32,6 @@ router.get('/:id', getEventById);
 // Create event (organizer required)
 router.post('/', authenticate, authorizeRoles('organizer'), createEvent);
 
-// Get organizer's events
-router.get('/organizer/my-events', authenticate, authorizeRoles('organizer'), getMyEvents);
-
 // Update event (organizer only)
 router.put('/:id', authenticate, authorizeRoles('organizer'), updateEvent);
 
@@ -39,12 +39,14 @@ router.put('/:id', authenticate, authorizeRoles('organizer'), updateEvent);
 router.delete('/:id', authenticate, authorizeRoles('organizer'), deleteEvent);
 
 // Publish event (organizer only)
-router.post('/:id/publish', authenticate, authorizeRoles('organizer'), publishEvent);
+router.patch('/:id/publish', authenticate, authorizeRoles('organizer'), publishEvent);
 
-/**
- * ADMIN ROUTES
- */
-// Approve/reject event (admin only)
-router.post('/:id/approve', authenticate, adminOnly, approveEvent);
+// Update sponsorship requirements (organizer only)
+router.put(
+  '/:id/sponsorship-requirements',
+  authenticate,
+  authorizeRoles('organizer'),
+  updateSponsorshipRequirements
+);
 
 export default router;

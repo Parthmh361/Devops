@@ -9,9 +9,13 @@ export interface IEvent extends Document {
   location?: string;
   eventMode: 'online' | 'offline' | 'hybrid';
   sponsorshipNeeds: {
-    amountRequired: number;
+    tiers: Array<{
+      name: string;
+      amount: number;
+      benefits: string[];
+    }>;
     categories: string[];
-    benefits: string[];
+    customBenefits: string[];
   };
   organizer: mongoose.Types.ObjectId;
   status: 'draft' | 'published' | 'closed';
@@ -59,16 +63,37 @@ const EventSchema = new Schema<IEvent>(
       default: 'offline',
     },
     sponsorshipNeeds: {
-      amountRequired: {
-        type: Number,
-        default: 0,
-      },
-      categories: [{
-        type: String,
-      }],
-      benefits: [{
-        type: String,
-      }],
+      tiers: [
+        {
+          name: {
+            type: String,
+            trim: true,
+          },
+          amount: {
+            type: Number,
+            min: 0,
+            default: 0,
+          },
+          benefits: [
+            {
+              type: String,
+              trim: true,
+            },
+          ],
+        },
+      ],
+      categories: [
+        {
+          type: String,
+          trim: true,
+        },
+      ],
+      customBenefits: [
+        {
+          type: String,
+          trim: true,
+        },
+      ],
     },
     organizer: {
       type: mongoose.Schema.Types.ObjectId,

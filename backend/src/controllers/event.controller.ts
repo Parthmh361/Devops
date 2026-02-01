@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import Event from '../models/Event.model';
+
+const isValidObjectId = (id: string): boolean => mongoose.Types.ObjectId.isValid(id);
 
 /**
  * Create a new event
@@ -37,7 +40,7 @@ export const createEvent = async (req: Request, res: Response): Promise<void> =>
       endDate,
       location,
       eventMode: eventMode || 'offline',
-      sponsorshipNeeds: sponsorshipNeeds || { amountRequired: 0, categories: [], benefits: [] },
+      sponsorshipNeeds: sponsorshipNeeds || { tiers: [], categories: [], customBenefits: [] },
       organizer: userId,
       status: 'draft',
     });
@@ -102,6 +105,14 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
     const userId = (req as any).user?.userId;
     const userRole = (req as any).user?.role;
 
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid event ID',
+      });
+      return;
+    }
+
     const event = await Event.findById(id)
       .populate('organizer', 'name email organizationName')
       .populate({
@@ -144,7 +155,7 @@ export const getEventById = async (req: Request, res: Response): Promise<void> =
 
 /**
  * Get organizer's events
- * GET /api/events/organizer/my-events
+ * GET /api/events/my
  * Auth: Organizer required
  */
 export const getMyEvents = async (req: Request, res: Response): Promise<void> => {
@@ -180,6 +191,14 @@ export const updateEvent = async (req: Request, res: Response): Promise<void> =>
     const userId = (req as any).user?.userId;
     const { title, description, category, startDate, endDate, location, eventMode, sponsorshipNeeds } = req.body;
 
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid event ID',
+      });
+      return;
+    }
+
     const event = await Event.findById(id);
 
     if (!event) {
@@ -199,11 +218,11 @@ export const updateEvent = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Only draft events can be updated
-    if (event.status !== 'draft') {
+    // Closed events cannot be updated
+    if (event.status === 'closed') {
       res.status(400).json({
         success: false,
-        message: 'Only draft events can be updated',
+        message: 'Closed events cannot be updated',
       });
       return;
     }
@@ -245,6 +264,14 @@ export const deleteEvent = async (req: Request, res: Response): Promise<void> =>
     const { id } = req.params;
     const userId = (req as any).user?.userId;
 
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid event ID',
+      });
+      return;
+    }
+
     const event = await Event.findById(id);
 
     if (!event) {
@@ -264,11 +291,11 @@ export const deleteEvent = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Only draft events can be deleted
-    if (event.status !== 'draft') {
+    // Published events cannot be deleted
+    if (event.status === 'published') {
       res.status(400).json({
         success: false,
-        message: 'Only draft events can be deleted',
+        message: 'Published events cannot be deleted',
       });
       return;
     }
@@ -298,6 +325,14 @@ export const publishEvent = async (req: Request, res: Response): Promise<void> =
     const { id } = req.params;
     const userId = (req as any).user?.userId;
 
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid event ID',
+      });
+      return;
+    }
+
     const event = await Event.findById(id);
 
     if (!event) {
@@ -313,6 +348,14 @@ export const publishEvent = async (req: Request, res: Response): Promise<void> =
       res.status(403).json({
         success: false,
         message: 'You can only publish your own events',
+      });
+      return;
+    }
+
+    if (event.status === 'published') {
+      res.status(400).json({
+        success: false,
+        message: 'Event is already published',
       });
       return;
     }
@@ -344,6 +387,14 @@ export const approveEvent = async (req: Request, res: Response): Promise<void> =
     const { id } = req.params;
     const { isApproved } = req.body;
 
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid event ID',
+      });
+      return;
+    }
+
     const event = await Event.findById(id);
 
     if (!event) {
@@ -367,6 +418,73 @@ export const approveEvent = async (req: Request, res: Response): Promise<void> =
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to approve event',
+    });
+  }
+};
+
+/**
+ * Update sponsorship requirements
+ * PUT /api/events/:id/sponsorship-requirements
+ * Auth: Organizer (owner only)
+ */
+export const updateSponsorshipRequirements = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).user?.userId;
+    const { tiers, categories, customBenefits } = req.body;
+
+    if (!isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid event ID',
+      });
+      return;
+    }
+
+    const event = await Event.findById(id);
+
+    if (!event) {
+      res.status(404).json({
+        success: false,
+        message: 'Event not found',
+      });
+      return;
+    }
+
+    if (event.organizer.toString() !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'You can only update your own events',
+      });
+      return;
+    }
+
+    if (!['draft', 'published'].includes(event.status)) {
+      res.status(400).json({
+        success: false,
+        message: 'Sponsorship requirements can only be updated for draft or published events',
+      });
+      return;
+    }
+
+    event.sponsorshipNeeds = {
+      tiers: Array.isArray(tiers) ? tiers : event.sponsorshipNeeds?.tiers || [],
+      categories: Array.isArray(categories) ? categories : event.sponsorshipNeeds?.categories || [],
+      customBenefits: Array.isArray(customBenefits) ? customBenefits : event.sponsorshipNeeds?.customBenefits || [],
+    };
+
+    await event.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Sponsorship requirements updated successfully',
+      data: event,
+    });
+  } catch (error: any) {
+    console.error('Update sponsorship requirements error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update sponsorship requirements',
     });
   }
 };
