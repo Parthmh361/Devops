@@ -6,6 +6,8 @@ export interface IEvent extends Document {
   category?: string;
   startDate: Date;
   endDate: Date;
+  date: Date; // Specific event date
+  amountRequired: number; // Total sponsorship amount required
   location?: string;
   eventMode: 'online' | 'offline' | 'hybrid';
   sponsorshipNeeds: {
@@ -47,11 +49,22 @@ const EventSchema = new Schema<IEvent>(
       type: Date,
       required: true,
       validate: {
-        validator: function(this: IEvent, value: Date) {
+        validator: function (this: IEvent, value: Date) {
           return value > this.startDate;
         },
         message: 'End date must be after start date',
       },
+    },
+    date: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    amountRequired: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
     },
     location: {
       type: String,

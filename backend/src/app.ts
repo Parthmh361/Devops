@@ -16,6 +16,7 @@ import documentRoutes from './routes/document.routes';
 import adminUserRoutes from './routes/admin.user.routes';
 import adminEventRoutes from './routes/admin.event.routes';
 import adminAnalyticsRoutes from './routes/admin.analytics.routes';
+import sponsorshipRoutes from './routes/sponsorship.routes';
 
 dotenv.config();
 
@@ -48,6 +49,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/admin/events', adminEventRoutes);
 app.use('/api/admin/analytics', adminAnalyticsRoutes);
+app.use('/api/sponsorship', sponsorshipRoutes);
 
 // Health check endpoint
 app.get('/api', (_req: Request, res: Response) => {

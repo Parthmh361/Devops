@@ -11,14 +11,14 @@ const isValidObjectId = (id: string): boolean => mongoose.Types.ObjectId.isValid
  */
 export const createEvent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, category, startDate, endDate, location, eventMode, sponsorshipNeeds } = req.body;
+    const { title, description, category, startDate, endDate, date, amountRequired, location, eventMode, sponsorshipNeeds } = req.body;
     const userId = (req as any).user?.userId;
 
     // Validate required fields
-    if (!title || !description || !startDate || !endDate) {
+    if (!title || !description || !startDate || !endDate || !date || amountRequired === undefined) {
       res.status(400).json({
         success: false,
-        message: 'Title, description, startDate, and endDate are required',
+        message: 'Title, description, startDate, endDate, date, and amountRequired are required',
       });
       return;
     }
@@ -38,11 +38,14 @@ export const createEvent = async (req: Request, res: Response): Promise<void> =>
       category,
       startDate,
       endDate,
+      date,
+      amountRequired,
       location,
       eventMode: eventMode || 'offline',
       sponsorshipNeeds: sponsorshipNeeds || { tiers: [], categories: [], customBenefits: [] },
       organizer: userId,
-      status: 'draft',
+      status: 'published',
+      isApproved: true,
     });
 
     await newEvent.save();
@@ -236,7 +239,7 @@ export const updateEvent = async (req: Request, res: Response): Promise<void> =>
   try {
     const { id } = req.params;
     const userId = (req as any).user?.userId;
-    const { title, description, category, startDate, endDate, location, eventMode, sponsorshipNeeds } = req.body;
+    const { title, description, category, startDate, endDate, date, amountRequired, location, eventMode, sponsorshipNeeds } = req.body;
 
     if (!isValidObjectId(id)) {
       res.status(400).json({
@@ -280,6 +283,8 @@ export const updateEvent = async (req: Request, res: Response): Promise<void> =>
     if (category) event.category = category;
     if (startDate) event.startDate = new Date(startDate);
     if (endDate) event.endDate = new Date(endDate);
+    if (date) event.date = new Date(date);
+    if (amountRequired !== undefined) event.amountRequired = amountRequired;
     if (location) event.location = location;
     if (eventMode) event.eventMode = eventMode;
     if (sponsorshipNeeds) event.sponsorshipNeeds = sponsorshipNeeds;
